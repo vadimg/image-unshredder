@@ -63,13 +63,13 @@ def mean(l):
 
 # assigns a score to an interval based on a proprietary algorithm ;)
 def interval_score(l, interval):
-    ints = []
+    inc = [] # distances included in interval
     for i in xrange(interval-1, len(l), interval):
-        ints.append(l[i])
+        inc.append(l[i])
 
-    ex = set(l) - set(ints)
+    ex = set(l) - set(inc) # all the other distances
 
-    return mean(ints) - max(ex)
+    return mean(inc) - max(ex)
 
 class Img(object):
     def __init__(self, image):
