@@ -1,6 +1,9 @@
 import sys
 from PIL import Image
 
+# usage: python unshred.py SHREDDED_FILENAME
+# saves unshredded image to unshredded.jpg
+
 def unshred(filename):
     image = Image.open(filename)
 
