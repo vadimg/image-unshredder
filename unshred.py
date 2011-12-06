@@ -4,7 +4,9 @@ from PIL import Image
 # usage: python unshred.py SHREDDED_FILENAME
 # saves unshredded image to unshredded.jpg
 
-def unshred(filename):
+def unshred(filename, output_filename):
+    """unshred filename and save the result as output_filename (JPEG)"""
+
     image = Image.open(filename)
 
     width, height = image.size
@@ -49,14 +51,14 @@ def unshred(filename):
     for i in inorder:
         builder.append(i)
 
-    builder.save()
+    builder.save(output_filename)
 
-# euclidean distance between 2 n-dimensional points
 def distance(p1, p2):
+    """return euclidean distance between 2 n-dimensional points"""
     return sum((a-b)**2 for a, b in zip(p1, p2))**(.5)
 
-# returns number not found in list of numbers between 0 and len(l)
 def hole(l):
+    """returns number not found in list of numbers between 0 and len(l)"""
     for n in xrange(len(l)):
         if n not in l:
             return n
@@ -64,8 +66,11 @@ def hole(l):
 def mean(l):
     return sum(l)/len(l)
 
-# assigns a score to an interval based on a proprietary algorithm ;)
 def interval_score(l, interval):
+    """
+    return a score for an interval based on a proprietary algorithm ;)
+    mean of all distances in interval - max of all distances not in interval
+    """
     inc = [] # distances included in interval
     for i in xrange(interval-1, len(l), interval):
         inc.append(l[i])
@@ -75,6 +80,8 @@ def interval_score(l, interval):
     return mean(inc) - max(ex)
 
 class Img(object):
+    """handles image calculations for unshredding"""
+
     def __init__(self, image):
         self._image = image
         self._pixels = image.getdata()
@@ -84,15 +91,17 @@ class Img(object):
         pixel = self._pixels[y * width + x]
         return pixel
 
-    # sum of all euclidean distances between the
-    # right part of strip n1 and the left part of strip n2
     def strip_distance(self, strip_width, n1, n2):
+        """
+        return sum of all euclidean distances between the
+        right part of strip n1 and the left part of strip n2
+        """
         x1 = n1 * strip_width + (strip_width-1)
         x2 = n2 * strip_width
         return self.line_distance(x1, x2)
 
-    # sum of all euclidean distances between 2 vertical lines
     def line_distance(self, x1, x2):
+        """return sum of all euclidean distances between 2 vertical lines"""
         s = 0
         for y in xrange(self._image.size[1]):
             p1 = self.get_pixel(x1, y)
@@ -101,6 +110,8 @@ class Img(object):
         return s
 
 class UnshredBuilder(object):
+    """builds the undshredded image"""
+
     def __init__(self, shredded_image, ncols):
         self._shredded_image = shredded_image
         self._unshredded = Image.new('RGBA', shredded_image.size)
@@ -108,8 +119,8 @@ class UnshredBuilder(object):
         self._height = self._shredded_image.size[1]
         self._n = 0
 
-    # appends strip n from the shredded image to the unshredded image
     def append(self, n):
+        """appends strip n from the shredded image to the unshredded image"""
         x1, y1 = self._shred_width * n, 0
         x2, y2 = x1 + self._shred_width, self._height
 
@@ -120,9 +131,9 @@ class UnshredBuilder(object):
 
         self._n += 1
 
-    def save(self):
-        self._unshredded.save('unshredded.jpg', 'JPEG')
+    def save(self, output_filename):
+        self._unshredded.save(output_filename, 'JPEG')
 
 if __name__ == '__main__':
-    unshred(sys.argv[1])
+    unshred(sys.argv[1], 'unshredded.jpg')
 
