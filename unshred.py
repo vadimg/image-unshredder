@@ -4,109 +4,93 @@ from PIL import Image
 # usage: python unshred.py SHREDDED_FILENAME
 # saves unshredded image to unshredded.jpg
 
-def unshred(filename, output_filename):
+def main(filename, output_filename):
     """unshred filename and save the result as output_filename (JPEG)"""
 
-    image = Image.open(filename)
+    unshredder = Unshredder(filename)
 
-    width, height = image.size
+    strip_width = unshredder.get_strip_width()
 
-    img = Img(image)
+    unshredder.unshred(strip_width, output_filename)
 
-    # calculate distances between all adjacent vertical lines
-    distances = []
-    for i in xrange(width-1):
-        distances.append(img.line_distance(i, i+1))
-
-    # break the lines up into intervals and score them
-    scores = []
-    for i in xrange(2, width/2+1):
-        if width % i == 0:
-            scores.append((i, interval_score(distances, i)))
-
-    # strip width is the interval with the highest score
-    strip_width = max(scores, key=lambda x: x[1])[0]
-
-    num_strips = width/strip_width
-
-    # create a matrix of strip distances
-    distances = [[None]*num_strips for _ in xrange(num_strips)]
-    for p1 in xrange(num_strips):
-        for p2 in xrange(num_strips):
-            distances[p1][p2] = img.strip_distance(strip_width, p1, p2)
-
-    # nexts[i] = j means strip j comes right after strip i
-    # select j by choosing the strip with the minimum distance from i
-    nexts = []
-    for l in distances:
-        nexts.append(l.index(min(l)))
-
-    first = hole(nexts) # the first strip
-
-    # build the rest of the strips in order
-    inorder = [first]
-    for _ in xrange(len(nexts)-1):
-        inorder.append(nexts[inorder[-1]])
-
-    builder = UnshredBuilder(image, num_strips)
-    for i in inorder:
-        builder.append(i)
-
-    builder.save(output_filename)
-
-def distance(p1, p2):
-    """return euclidean distance between 2 n-dimensional points"""
-    return sum((a-b)**2 for a, b in zip(p1, p2))**(.5)
-
-def hole(l):
-    """returns number not found in list of numbers between 0 and len(l)"""
-    for n in xrange(len(l)):
-        if n not in l:
-            return n
-
-def mean(l):
-    return sum(l)/len(l)
-
-def interval_score(l, interval):
-    """
-    return a score for an interval based on a proprietary algorithm ;)
-    mean of all distances in interval - max of all distances not in interval
-    """
-    inc = [] # distances included in interval
-    for i in xrange(interval-1, len(l), interval):
-        inc.append(l[i])
-
-    ex = set(l) - set(inc) # all the other distances
-
-    return mean(inc) - max(ex)
-
-class Img(object):
+class Unshredder(object):
     """handles image calculations for unshredding"""
 
-    def __init__(self, image):
-        self._image = image
-        self._pixels = image.getdata()
+    def __init__(self, filename):
+        self._image = Image.open(filename)
+        self._pixels = self._image.getdata()
 
-    def get_pixel(self, x, y):
+    def get_strip_width(self):
+        """return estimate of strip width in shredded image"""
+        width, height = self._image.size
+
+        # calculate distances between all adjacent vertical lines
+        distances = []
+        for i in xrange(width-1):
+            distances.append(self._line_distance(i, i+1))
+
+        # break the lines up into intervals and score them
+        scores = []
+        for i in xrange(2, width/2+1):
+            if width % i == 0:
+                scores.append((i, interval_score(distances, i)))
+
+        # strip width is the interval with the highest score
+        strip_width = max(scores, key=lambda x: x[1])[0]
+
+        return strip_width
+
+    def unshred(self, strip_width, output_filename):
+        """saves unshredded image to output_filename"""
+        width, height = self._image.size
+
+        num_strips = width/strip_width
+
+        # create a matrix of strip distances
+        distances = [[None]*num_strips for _ in xrange(num_strips)]
+        for p1 in xrange(num_strips):
+            for p2 in xrange(num_strips):
+                distances[p1][p2] = self._strip_distance(strip_width, p1, p2)
+
+        # nexts[i] = j means strip j comes right after strip i
+        # select j by choosing the strip with the minimum distance from i
+        nexts = []
+        for l in distances:
+            nexts.append(l.index(min(l)))
+
+        first = hole(nexts) # the first strip
+
+        # build the rest of the strips in order
+        inorder = [first]
+        for _ in xrange(len(nexts)-1):
+            inorder.append(nexts[inorder[-1]])
+
+        builder = UnshredBuilder(self._image, num_strips)
+        for i in inorder:
+            builder.append(i)
+
+        builder.save(output_filename)
+
+    def _get_pixel(self, x, y):
         width, height = self._image.size
         pixel = self._pixels[y * width + x]
         return pixel
 
-    def strip_distance(self, strip_width, n1, n2):
+    def _strip_distance(self, strip_width, n1, n2):
         """
         return sum of all euclidean distances between the
         right part of strip n1 and the left part of strip n2
         """
         x1 = n1 * strip_width + (strip_width-1)
         x2 = n2 * strip_width
-        return self.line_distance(x1, x2)
+        return self._line_distance(x1, x2)
 
-    def line_distance(self, x1, x2):
+    def _line_distance(self, x1, x2):
         """return sum of all euclidean distances between 2 vertical lines"""
         s = 0
         for y in xrange(self._image.size[1]):
-            p1 = self.get_pixel(x1, y)
-            p2 = self.get_pixel(x2, y)
+            p1 = self._get_pixel(x1, y)
+            p2 = self._get_pixel(x2, y)
             s += distance(p1, p2)
         return s
 
@@ -135,6 +119,32 @@ class UnshredBuilder(object):
     def save(self, output_filename):
         self._unshredded.save(output_filename, 'JPEG')
 
+def distance(p1, p2):
+    """return euclidean distance between 2 n-dimensional points"""
+    return sum((a-b)**2 for a, b in zip(p1, p2))**(.5)
+
+def hole(l):
+    """returns number not found in list of numbers between 0 and len(l)"""
+    for n in xrange(len(l)):
+        if n not in l:
+            return n
+
+def mean(l):
+    return sum(l)/len(l)
+
+def interval_score(l, interval):
+    """
+    return a score for an interval based on a proprietary algorithm ;)
+    mean of all distances in interval - max of all distances not in interval
+    """
+    inc = [] # distances included in interval
+    for i in xrange(interval-1, len(l), interval):
+        inc.append(l[i])
+
+    ex = set(l) - set(inc) # all the other distances
+
+    return mean(inc) - max(ex)
+
 if __name__ == '__main__':
-    unshred(sys.argv[1], 'unshredded.jpg')
+    main(sys.argv[1], 'unshredded.jpg')
 
