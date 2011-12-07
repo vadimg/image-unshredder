@@ -36,6 +36,7 @@ def unshred(filename, output_filename):
             distances[p1][p2] = img.strip_distance(strip_width, p1, p2)
 
     # nexts[i] = j means strip j comes right after strip i
+    # select j by choosing the strip with the minimum distance from i
     nexts = []
     for l in distances:
         nexts.append(l.index(min(l)))
